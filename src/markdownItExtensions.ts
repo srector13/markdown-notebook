@@ -129,23 +129,23 @@ function escapeHtml(s: string): string {
 function addTaskLists(md: MarkdownIt): void {
   md.core.ruler.after('inline', 'notebook-task-lists', (state: any) => {
     const tokens = state.tokens;
+    // Track the enclosing list item with a stack in a single pass. (Scanning
+    // backwards from every inline token is O(n²) on documents without lists,
+    // which froze the preview on large notes.)
+    const itemStack: any[] = [];
     for (let i = 0; i < tokens.length; i++) {
-      if (tokens[i].type !== 'inline') {
+      if (tokens[i].type === 'list_item_open') {
+        itemStack.push(tokens[i]);
         continue;
       }
-      let parent = null;
-      for (let j = i - 1; j >= 0; j--) {
-        if (tokens[j].type === 'list_item_open') {
-          parent = tokens[j];
-          break;
-        }
-        if (tokens[j].type === 'list_item_close') {
-          break;
-        }
-      }
-      if (!parent) {
+      if (tokens[i].type === 'list_item_close') {
+        itemStack.pop();
         continue;
       }
+      if (tokens[i].type !== 'inline' || itemStack.length === 0) {
+        continue;
+      }
+      const parent = itemStack[itemStack.length - 1];
 
       const children = tokens[i].children;
       const text: string = tokens[i].content;
